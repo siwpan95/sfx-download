@@ -1,0 +1,15 @@
+{
+    "base_url": "https://www.findsounds.com",
+    "search_endpoint": "/ISAPI/search.dll",
+    "keywords": [
+        "beep", "alarm", "bell", "click", "ding", "buzz", "ring",
+        "beep beep", "warning", "siren", "horn", "whistle", "chime",
+        "laser", "explosion", "gunshot", "footstep", "door", "glass",
+        "water", "wind", "thunder", "rain", "bird", "dog", "cat",
+        "engine", "car", "phone", "button", "switch", "robot",
+        "electric", "metal", "wood", "paper", "machine", "typing",
+        "applause", "laugh", "scream", "crash", "bang", "boom",
+        "music", "guitar", "piano", "drum", "bass", "synth",
+        "ambient", "nature", "city", "crowd", "applause", "cheer"
+    ]
+}

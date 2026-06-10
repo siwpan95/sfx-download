@@ -1,0 +1,17 @@
+{
+    "base_url": "https://www.partnersinrhyme.com",
+    "categories": [
+        "/soundfx/weather_sounds",
+        "/soundfx/animal_sounds",
+        "/soundfx/cars_transport_sounds", 
+        "/soundfx/cartoon_sounds",
+        "/soundfx/computer_sounds",
+        "/soundfx/household_sounds",
+        "/soundfx/human_sounds",
+        "/soundfx/music_sounds",
+        "/soundfx/nature_sounds",
+        "/soundfx/sci_fi_sounds",
+        "/soundfx/sports_sounds",
+        "/soundfx/weapons_sounds"
+    ]
+}

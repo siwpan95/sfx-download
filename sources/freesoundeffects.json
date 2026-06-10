@@ -1,0 +1,21 @@
+{
+    "base_url": "https://www.freesoundeffects.com",
+    "categories": [
+        "/free-sound-effects/animals",
+        "/free-sound-effects/comedy",
+        "/free-sound-effects/construction",
+        "/free-sound-effects/domestic",
+        "/free-sound-effects/horror",
+        "/free-sound-effects/household",
+        "/free-sound-effects/human",
+        "/free-sound-effects/industrial",
+        "/free-sound-effects/musical",
+        "/free-sound-effects/nature",
+        "/free-sound-effects/scifi",
+        "/free-sound-effects/sports",
+        "/free-sound-effects/tools",
+        "/free-sound-effects/vehicles",
+        "/free-sound-effects/weapons"
+    ],
+    "search_terms": ["beep", "alarm", "click", "ding", "buzz", "ring", "explosion", "footstep"]
+}
