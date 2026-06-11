@@ -1,7 +1,0 @@
-{
-  "name": "QuickSounds",
-  "site": "quicksounds.com",
-  "description": "Free sound effects, mp3 download from /sound/{id} detail pages",
-  "base_url": "https://quicksounds.com",
-  "sound_id_range": [29000, 29300]
-}
