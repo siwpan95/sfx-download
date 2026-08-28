@@ -25,3 +25,6 @@ release/
 chrome-win64.zip
 .workbuddy/
 MIGRATED.txt
+
+# 运行时下载目录（2026-08-28 治理）
+sounds/

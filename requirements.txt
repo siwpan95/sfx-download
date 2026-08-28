@@ -1,0 +1,7 @@
+# sfx dependencies (auto-generated 2026-08-20)
+mutagen
+Pillow
+playsound3
+pydub
+pygame-ce
+pystray
