@@ -7,7 +7,8 @@
   数据源配置按 JSON 拆分: sources/ 目录下每个数据源一个 JSON
   按量下载（NUM_SOUNDS），内容随机，不按关键词
   CLI: python dl_sounds.py
-  GUI: python gui.py (Tkinter 图形界面)
+  本模块的抓取函数已被通用引擎整合：运行 python gui.py 或 python crawl.py
+  （基于 crawler_core）即可调用同样的音效源，并按 分类/源 分目录统一落盘到 sounds/。
   已移除: Freesound API, Pixabay API（需注册）
   已移除: Chosic（音乐播放列表生成器，无下载选项）
   已移除: OrangeFreeSounds, SoundsCrate（Cloudflare WAF 硬封锁，Playwright 也超时）
@@ -46,6 +47,7 @@ _fetch_page_scroll = sfx_utils.enhanced_fetch_page_scroll  # Playwright + 滚动
 
 
 def _save_file(filepath, data):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "wb") as f:
         f.write(data)
 
@@ -1180,7 +1182,9 @@ def _download_one(idx):
             status, audio = _fetch(url, referer=referer)
             if status == 200 and audio:
                 fname = _safe_filename(label, src_name, idx + 1)
-                filepath = os.path.join(SOUNDS_DIR, f"{fname}.{ext}")
+                # 统一落盘布局: sounds/sfx/<源名>/<名称>.<ext>
+                # （与通用引擎 crawler_core 的 <分类>/<源名>/ 约定一致，分类固定为 sfx）
+                filepath = os.path.join(SOUNDS_DIR, "sfx", src_name, f"{fname}.{ext}")
                 _save_file(filepath, audio)
                 print(f" -> {fname}.{ext}")
                 _source_stats.setdefault(src_name, {"ok": 0, "fail": 0})

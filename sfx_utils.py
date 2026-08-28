@@ -8,6 +8,9 @@ import os
 import time
 import random
 import ssl
+import subprocess
+import threading
+import contextlib
 import urllib.request
 import urllib.error
 
@@ -302,7 +305,94 @@ def _is_cf_challenge(html):
     return False
 
 
-def enhanced_fetch_page(url, timeout=30, cf_retries=3):
+# ═══════════════════════════════════════════════════════════
+#  硬超时看门狗（打断卡死的 Playwright 导航调用）
+# ═══════════════════════════════════════════════════════════
+
+# 在 Playwright 自带导航超时之上额外等待的秒数。
+# 连接不可达主机（防火墙丢弃 SYN）时，Chromium 的导航超时可能不触发，
+# page.goto / page.reload 会无限阻塞；超过「导航超时 + 该余量」即判定卡死并强制重启浏览器。
+_HARD_TIMEOUT_MARGIN = 20
+
+# 是否发生过硬超时强制重启（供上层统计/日志判断）
+_hard_timeout_triggered = False
+
+
+def hard_timeout_triggered():
+    """返回并清除「是否发生过硬超时」标志。"""
+    global _hard_timeout_triggered
+    flag = _hard_timeout_triggered
+    _hard_timeout_triggered = False
+    return flag
+
+
+def _kill_browser_processes():
+    """OS 级强制终止 Playwright 的 headless 浏览器进程（chrome-headless-shell.exe）。
+
+    用 taskkill 而非 Playwright API：看门狗运行在独立线程，而 sync API 不支持跨线程调用，
+    且其优雅关闭会等待活动导航、与主线程死锁。kill 进程后，主线程阻塞中的
+    page.goto/reload 会收到 TargetClosedError 而抛出。
+    """
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "chrome-headless-shell.exe"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except Exception:
+        pass
+
+
+def _force_stop_pw():
+    """看门狗专用：OS 级强制终止浏览器进程，打断卡死的 page.goto/reload。
+
+    置空 browser/context（纯赋值，线程安全），保留 _pw_playwright，
+    由主线程在下一次 enhanced_pw_init -> close_pw() 里 stop 回收 driver 进程。
+    """
+    global _pw_browser, _pw_context, _pw_page_count
+    _kill_browser_processes()
+    _pw_browser = None
+    _pw_context = None
+    _pw_page_count = 0
+
+
+def _hard_timeout_reset():
+    """看门狗回调：强制停止浏览器，打断卡死的 page.goto/reload。
+
+    停止 driver 后，阻塞中的导航调用会收到连接断开错误而抛出异常，
+    从而被 enhanced_fetch_page / enhanced_fetch_page_scroll 的 except 捕获并返回。
+    """
+    global _hard_timeout_triggered
+    _hard_timeout_triggered = True
+    try:
+        print("[hard-timeout] navigation exceeded hard limit, force-stopping browser")
+    except Exception:
+        pass
+    _force_stop_pw()
+
+
+@contextlib.contextmanager
+def _hard_timeout_guard(hard_seconds):
+    """在代码块执行期间部署看门狗：超过 hard_seconds 秒强制重启浏览器。
+
+    用法:
+        with _hard_timeout_guard(hard_timeout):
+            try:
+                page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
+            except Exception:
+                pass
+    """
+    watchdog = threading.Timer(hard_seconds, _hard_timeout_reset)
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        yield
+    finally:
+        watchdog.cancel()
+
+
+def enhanced_fetch_page(url, timeout=30, cf_retries=3, hard_timeout=None):
     """Playwright 获取 HTML 页面的文本内容 → (status, text)
 
     相比原始 _fetch_page() 的增强：
@@ -312,8 +402,12 @@ def enhanced_fetch_page(url, timeout=30, cf_retries=3):
     - 更精细的 CF 挑战等待：检测 #challenge-running 等 DOM 元素
     - 每次重试前重新加载页面
     - 浏览器崩溃时自动标记为需重连
+    - 硬超时看门狗：单次导航超过 hard_timeout 秒（默认 timeout + 20）强制重启浏览器，
+      避免连接不可达主机时 page.goto 无限阻塞
     """
     global _pw_browser, _pw_context, _pw_page_count
+    if hard_timeout is None or hard_timeout <= 0:
+        hard_timeout = timeout + _HARD_TIMEOUT_MARGIN
     page = None
     try:
         enhanced_pw_init()
@@ -321,11 +415,12 @@ def enhanced_fetch_page(url, timeout=30, cf_retries=3):
         _pw_page_count += 1
 
         for attempt in range(cf_retries + 1):
-            try:
-                # domcontentloaded 比 networkidle 快很多，且不会因广告挂起
-                page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
-            except Exception:
-                pass
+            with _hard_timeout_guard(hard_timeout):
+                try:
+                    # domcontentloaded 比 networkidle 快很多，且不会因广告挂起
+                    page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
+                except Exception:
+                    pass
 
             # 等待 JS 执行（CF 挑战、XHR 加载等）
             time.sleep(2 + attempt)
@@ -353,10 +448,11 @@ def enhanced_fetch_page(url, timeout=30, cf_retries=3):
             if attempt < cf_retries:
                 wait = 3 * (attempt + 1)
                 time.sleep(wait)
-                try:
-                    page.reload(timeout=timeout * 1000, wait_until="domcontentloaded")
-                except Exception:
-                    pass
+                with _hard_timeout_guard(hard_timeout):
+                    try:
+                        page.reload(timeout=timeout * 1000, wait_until="domcontentloaded")
+                    except Exception:
+                        pass
                 time.sleep(2)
 
         return (403 if html else 0), html
@@ -377,7 +473,7 @@ def enhanced_fetch_page(url, timeout=30, cf_retries=3):
 #  增强 Playwright 页面获取（带滚动加载 + 选择器等待）
 # ═══════════════════════════════════════════════════════════
 
-def enhanced_fetch_page_scroll(url, timeout=30, cf_retries=3,
+def enhanced_fetch_page_scroll(url, timeout=30, cf_retries=3, hard_timeout=None,
                                 scroll_count=0, scroll_delay=0.8,
                                 wait_selector=None, min_length=2000):
     """Playwright 获取 HTML + 滚动触发懒加载 + 可选等待选择器 → (status, text)
@@ -388,8 +484,11 @@ def enhanced_fetch_page_scroll(url, timeout=30, cf_retries=3,
     - wait_selector: CSS 选择器，等待该元素出现后再返回（超时 8s 不报错）
     - min_length: 最小内容长度，低于此值视为无效页面
     - 浏览器崩溃时自动标记为需重连
+    - 硬超时看门狗：单次导航超过 hard_timeout 秒（默认 timeout + 20）强制重启浏览器
     """
     global _pw_browser, _pw_context, _pw_page_count
+    if hard_timeout is None or hard_timeout <= 0:
+        hard_timeout = timeout + _HARD_TIMEOUT_MARGIN
     page = None
     try:
         enhanced_pw_init()
@@ -397,10 +496,11 @@ def enhanced_fetch_page_scroll(url, timeout=30, cf_retries=3,
         _pw_page_count += 1
 
         for attempt in range(cf_retries + 1):
-            try:
-                page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
-            except Exception:
-                pass
+            with _hard_timeout_guard(hard_timeout):
+                try:
+                    page.goto(url, timeout=timeout * 1000, wait_until="domcontentloaded")
+                except Exception:
+                    pass
 
             time.sleep(2 + attempt)
 
@@ -440,10 +540,11 @@ def enhanced_fetch_page_scroll(url, timeout=30, cf_retries=3,
 
             if attempt < cf_retries:
                 time.sleep(3 * (attempt + 1))
-                try:
-                    page.reload(timeout=timeout * 1000, wait_until="domcontentloaded")
-                except Exception:
-                    pass
+                with _hard_timeout_guard(hard_timeout):
+                    try:
+                        page.reload(timeout=timeout * 1000, wait_until="domcontentloaded")
+                    except Exception:
+                        pass
                 time.sleep(2)
 
         return (403 if html and len(html) > 0 else 0), html
