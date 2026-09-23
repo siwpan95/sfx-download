@@ -1,5 +1,8 @@
 # 通用免费公版音频爬取程序 (AudioCrawler)
 
+> 仓库：<https://gitee.com/siwpan/sfx-download> ｜ 许可：MIT-0（MIT No Attribution）（见 [LICENSE](LICENSE)）
+> 注：文中 <PATH> 为路径占位符，请替换为你本机实际的目录 / 可执行文件路径。
+
 在 `sfx` 免费音效下载器基础上改造而来的**通用**音频爬取引擎：既能抓取
 原 18 个免注册音效站，也能抓取 **公共领域 / CC0 / CC BY** 的免费公版音频
 （Internet Archive、LibriVox 有声书、SoundHelix、ccMixter 等）。
@@ -52,7 +55,7 @@ python gui.py
 
 # 试听已下载音频
 python player.py                  # 扫描 ./sounds
-python player.py D:\path\to\dir  # 扫描指定目录
+python player.py <PATH>  # 扫描指定目录
 ```
 
 ## 目录结构
