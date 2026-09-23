@@ -16,7 +16,10 @@ except ImportError:
     PYDUB_AVAILABLE = False
 
 CONFIG_FILE = os.path.expanduser("~/.musicplayer_config.json")
-SOUNDS_DIR = r"D:\allin\t0l\sfx\sounds"
+# 音频库根目录：环境变量 SOUNDS_DIR 优先，否则落本脚本同级的 sounds/
+# （原为本机一条已失效的绝对路径，见硬编码门禁清单；与 crawler_core.SOUNDS_DIR 口径一致）
+SOUNDS_DIR = os.environ.get("SOUNDS_DIR") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "sounds")
 TEMP_DIR = os.path.join(tempfile.gettempdir(), "sound_preview_converted")
 AUDIO_EXTENSIONS = (
     '.mp3', '.mp2', '.wav', '.wave', '.ogg', '.oga', '.flac',
