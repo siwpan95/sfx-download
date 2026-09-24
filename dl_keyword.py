@@ -11,7 +11,7 @@ Pixabay extractors from dl_sounds.  Files are saved to sounds/<keyword>/.
 
 Usage:
     python dl_keyword.py cowbell -n 40
-    python dl_keyword.py cowbell -n 60 --out D:\\samples
+    python dl_keyword.py cowbell -n 60 --out <输出目录>
     python dl_keyword.py cowbell --only Pixabay
 """
 
